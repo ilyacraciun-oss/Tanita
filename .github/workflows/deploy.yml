@@ -27,6 +27,10 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Auto-enable the Pages site via the API if it isn't already on,
+          # so no manual Settings toggle is required.
+          enablement: true
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
