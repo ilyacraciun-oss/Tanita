@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TANITA BC-545N · Body Composition Log</title>
+  <meta name="description" content="A precision log for Tanita BC-545N body composition measurements." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0c0e'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%232ee6d6' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%23ffb02e'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="glow glow-a" aria-hidden="true"></div>
+  <div class="glow glow-b" aria-hidden="true"></div>
+
+  <header class="topbar reveal" style="--d:0">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" width="40" height="40">
+          <circle cx="20" cy="20" r="15" fill="none" stroke="var(--teal)" stroke-width="1.5" opacity="0.7"/>
+          <circle cx="20" cy="20" r="9" fill="none" stroke="var(--amber)" stroke-width="1.5" opacity="0.8"/>
+          <circle cx="20" cy="20" r="3" fill="var(--amber)"/>
+          <line x1="20" y1="1" x2="20" y2="6" stroke="var(--teal)" stroke-width="1.5"/>
+          <line x1="20" y1="34" x2="20" y2="39" stroke="var(--teal)" stroke-width="1.5"/>
+          <line x1="1" y1="20" x2="6" y2="20" stroke="var(--teal)" stroke-width="1.5"/>
+          <line x1="34" y1="20" x2="39" y2="20" stroke="var(--teal)" stroke-width="1.5"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>TANITA <span class="sep">//</span> BC&#8209;545N</h1>
+        <p class="brand-sub" id="statusline">Body Composition Monitor · initializing&hellip;</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn ghost" id="btn-import" title="Import a previously exported JSON file">Import</button>
+      <button class="btn ghost" id="btn-export" title="Download all readings as JSON">Export</button>
+      <button class="btn primary" id="btn-new">+ New Reading</button>
+      <input type="file" id="file-import" accept="application/json,.json" hidden />
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== HERO / LATEST READOUT ===== -->
+    <section class="hero reveal" style="--d:1" id="hero">
+      <!-- populated by JS -->
+    </section>
+
+    <!-- ===== BODY MAP + SEGMENTAL MUSCLE ===== -->
+    <section class="panel reveal" style="--d:2" id="segment-panel">
+      <div class="panel-head">
+        <h2>Segmental Muscle Mass</h2>
+        <p class="panel-sub">Latest reading · kilograms per region</p>
+      </div>
+      <div class="segment-body">
+        <div class="bodymap" id="bodymap"><!-- svg injected --></div>
+        <div class="segment-legend" id="segment-legend"><!-- injected --></div>
+      </div>
+    </section>
+
+    <!-- ===== TRENDS ===== -->
+    <section class="panel reveal" style="--d:3">
+      <div class="panel-head">
+        <h2>Trends</h2>
+        <p class="panel-sub">Click any tile to inspect &middot; figures show change vs. previous reading</p>
+      </div>
+      <div class="tiles" id="tiles"><!-- injected --></div>
+    </section>
+
+    <!-- ===== FOCUS CHART ===== -->
+    <section class="panel reveal" style="--d:4" id="focus-panel">
+      <div class="panel-head focus-head">
+        <div>
+          <h2 id="focus-title">Weight</h2>
+          <p class="panel-sub" id="focus-sub">kilograms over time</p>
+        </div>
+        <div class="range-switch" id="range-switch" role="tablist" aria-label="Time range">
+          <button data-range="30" class="range-btn">30d</button>
+          <button data-range="90" class="range-btn">90d</button>
+          <button data-range="365" class="range-btn">1y</button>
+          <button data-range="all" class="range-btn is-active">All</button>
+        </div>
+      </div>
+      <div class="bigchart-wrap">
+        <div class="bigchart" id="bigchart"><!-- svg injected --></div>
+      </div>
+    </section>
+
+    <!-- ===== HISTORY ===== -->
+    <section class="panel reveal" style="--d:5">
+      <div class="panel-head">
+        <h2>Log</h2>
+        <p class="panel-sub" id="log-sub">All recorded sessions</p>
+      </div>
+      <div class="table-scroll">
+        <table class="log-table" id="log-table"><!-- injected --></table>
+      </div>
+    </section>
+
+    <footer class="footer reveal" style="--d:6">
+      <span>Stored locally in this browser · nothing leaves your device.</span>
+      <button class="link-btn" id="btn-seed">Load sample data</button>
+      <button class="link-btn danger" id="btn-clear">Erase everything</button>
+    </footer>
+  </main>
+
+  <!-- ===== ENTRY MODAL ===== -->
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h2 id="modal-title">New Reading</h2>
+        <button class="icon-btn" id="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <form id="entry-form" class="entry-form" novalidate>
+        <input type="hidden" id="f-id" />
+        <div class="form-grid">
+          <label class="field span-2">
+            <span>Date</span>
+            <input type="date" id="f-date" required />
+          </label>
+
+          <div class="form-group span-2">
+            <h3 class="group-title"><i class="dot dot-amber"></i>Core composition</h3>
+          </div>
+          <label class="field"><span>Weight <i>kg</i></span><input type="number" step="0.1" id="f-weight" inputmode="decimal" /></label>
+          <label class="field"><span>BMI</span><input type="number" step="0.1" id="f-bmi" inputmode="decimal" /></label>
+          <label class="field"><span>Body Fat <i>%</i></span><input type="number" step="0.1" id="f-fat" inputmode="decimal" /></label>
+          <label class="field"><span>Body Water <i>%</i></span><input type="number" step="0.1" id="f-water" inputmode="decimal" /></label>
+          <label class="field"><span>Muscle Mass <i>kg</i></span><input type="number" step="0.1" id="f-muscle" inputmode="decimal" /></label>
+          <label class="field"><span>Bone Mass <i>kg</i></span><input type="number" step="0.1" id="f-bone" inputmode="decimal" /></label>
+
+          <div class="form-group span-2">
+            <h3 class="group-title"><i class="dot dot-teal"></i>Metabolic &amp; rating</h3>
+          </div>
+          <label class="field"><span>Energy / BMR <i>kcal/day</i></span><input type="number" step="1" id="f-bmr" inputmode="numeric" /></label>
+          <label class="field"><span>Metabolic Age <i>yr</i></span><input type="number" step="1" id="f-bioage" inputmode="numeric" /></label>
+          <label class="field"><span>Fitness Level <i>1&ndash;10</i></span><input type="number" step="1" min="1" max="10" id="f-fitness" inputmode="numeric" /></label>
+          <label class="field"><span>Visceral Fat <i>1&ndash;10</i></span><input type="number" step="1" min="1" max="59" id="f-visceral" inputmode="numeric" /></label>
+
+          <div class="form-group span-2">
+            <h3 class="group-title"><i class="dot dot-amber"></i>Segmental muscle mass <i class="group-note">kg</i></h3>
+          </div>
+          <label class="field"><span>Right Arm</span><input type="number" step="0.01" id="f-armRight" inputmode="decimal" /></label>
+          <label class="field"><span>Left Arm</span><input type="number" step="0.01" id="f-armLeft" inputmode="decimal" /></label>
+          <label class="field span-2"><span>Trunk</span><input type="number" step="0.1" id="f-trunk" inputmode="decimal" /></label>
+          <label class="field"><span>Right Leg</span><input type="number" step="0.01" id="f-legRight" inputmode="decimal" /></label>
+          <label class="field"><span>Left Leg</span><input type="number" step="0.01" id="f-legLeft" inputmode="decimal" /></label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn ghost" id="btn-delete" hidden>Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="btn-cancel">Cancel</button>
+          <button type="submit" class="btn primary">Save reading</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
