@@ -46,8 +46,10 @@ npx http-server . -o      # or: python3 -m http.server
 
 ### Deploy free on GitHub Pages
 
-Push these files to a repo and enable **Settings → Pages → Deploy from
-branch**. The app needs no build step.
+Enable **Settings → Pages → Build and deployment → Source → "Deploy from a
+branch"**, choose branch `main` and folder `/ (root)`, then **Save**. GitHub
+publishes the site automatically on every push — no build step, no workflow.
+The live URL appears at the top of that Pages settings page.
 
 ## How your data works
 
