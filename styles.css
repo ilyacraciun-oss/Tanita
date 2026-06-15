@@ -240,6 +240,63 @@ main { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; paddin
 .row-edit { color: var(--ink-faint); cursor: pointer; border: none; background: none; font-family: var(--mono); font-size: 14px; padding: 2px 6px; border-radius: 6px; }
 .row-edit:hover { color: var(--amber); background: rgba(255,176,46,.1); }
 
+/* ============================================================ COACH */
+.coach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.coach-card {
+  position: relative; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--panel), var(--bg-2)); padding: 18px 18px 16px;
+  overflow: hidden;
+}
+.coach-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent, var(--amber)); }
+.coach-card.tone-good   { --accent: var(--teal); }
+.coach-card.tone-warn   { --accent: var(--amber); }
+.coach-card.tone-alert  { --accent: var(--coral); }
+.coach-card.tone-fuel   { --accent: var(--violet); }
+.coach-ico { font-size: 22px; line-height: 1; }
+.coach-card h3 { margin: 8px 0 6px; font-family: var(--mono); font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.coach-card p { margin: 0; font-size: 13.5px; line-height: 1.62; color: var(--ink-dim); }
+.coach-card p b { color: var(--ink); font-weight: 600; }
+.coach-card .accent-txt { color: var(--accent); font-weight: 600; }
+.coach-card ul { margin: 8px 0 0; padding-left: 18px; }
+.coach-card li { font-size: 13px; line-height: 1.6; color: var(--ink-dim); margin-bottom: 3px; }
+.coach-card li::marker { color: var(--accent); }
+
+/* ============================================================ BADGES */
+.badge-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.badge-score { text-align: right; font-family: var(--mono); }
+.badge-score .bs-count { font-size: 26px; font-weight: 700; color: var(--amber); font-variant-numeric: tabular-nums; }
+.badge-score .bs-count small { color: var(--ink-faint); font-size: 14px; font-weight: 400; }
+.badge-score .bs-label { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; }
+.badge {
+  position: relative; border-radius: 14px; padding: 18px 14px 14px; text-align: center;
+  border: 1px solid var(--line); background: linear-gradient(180deg, var(--panel), var(--bg-2));
+  overflow: hidden; transition: transform .18s ease, border-color .2s;
+}
+.badge:hover { transform: translateY(-3px); }
+.badge .b-medal { font-size: 36px; line-height: 1; display: block; filter: grayscale(1) brightness(.55); transition: filter .3s, transform .3s; }
+.badge .b-name { margin-top: 9px; font-family: var(--disp); font-weight: 700; font-size: 14px; letter-spacing: -.01em; }
+.badge .b-desc { margin-top: 4px; font-family: var(--mono); font-size: 10.5px; line-height: 1.45; color: var(--ink-faint); }
+.badge .b-tier { position: absolute; top: 9px; right: 10px; font-family: var(--mono); font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.badge .b-prog { margin-top: 9px; height: 5px; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
+.badge .b-prog > span { display: block; height: 100%; border-radius: 999px; background: var(--line); }
+
+.badge.earned { border-color: color-mix(in srgb, var(--tier-col) 55%, var(--line)); box-shadow: inset 0 0 22px -10px var(--tier-col), 0 10px 30px -22px var(--tier-col); }
+.badge.earned::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120px 60px at 50% 0%, color-mix(in srgb, var(--tier-col) 22%, transparent), transparent 70%); }
+.badge.earned .b-medal { filter: none; transform: scale(1.04); animation: medalPop .5s cubic-bezier(.2,.9,.3,1.4) both; }
+.badge.earned .b-name { color: var(--ink); }
+.badge.earned .b-tier { color: var(--tier-col); }
+.badge.earned .b-prog > span { background: linear-gradient(90deg, color-mix(in srgb, var(--tier-col) 60%, var(--teal)), var(--tier-col)); }
+@keyframes medalPop { 0% { transform: scale(.4) rotate(-12deg); opacity: 0; } }
+
+.tier-bronze   { --tier-col: #c8803c; }
+.tier-silver   { --tier-col: #c2cdd6; }
+.tier-gold     { --tier-col: #ffc23d; }
+.tier-platinum { --tier-col: #5fe0ff; }
+
+@media (max-width: 760px){ .seg-fields { grid-template-columns: 1fr; } }
+
 /* ============================================================ FOOTER */
 .footer { display: flex; align-items: center; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 28px; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
 
@@ -275,6 +332,19 @@ main { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; paddin
 .field input:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px rgba(255,176,46,.14); }
 .field input::-webkit-outer-spin-button, .field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .field input[type=date] { color-scheme: dark; }
+
+/* collapsible segmental disclosure inside the form */
+.seg-details { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); overflow: hidden; }
+.seg-details > summary { list-style: none; cursor: pointer; padding: 13px 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: background .2s; }
+.seg-details > summary::-webkit-details-marker { display: none; }
+.seg-details > summary:hover { background: rgba(255,255,255,.025); }
+.seg-sum-label { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); display: flex; align-items: center; gap: 8px; }
+.seg-sum-label .group-note { color: var(--ink-faint); font-style: normal; letter-spacing: 0; text-transform: none; }
+.seg-chevron { color: var(--amber); font-size: 13px; transition: transform .25s ease; }
+.seg-details[open] > summary { border-bottom: 1px solid var(--line); background: rgba(255,176,46,.05); }
+.seg-details[open] .seg-chevron { transform: rotate(180deg); }
+.seg-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 16px 15px; animation: segIn .3s ease; }
+@keyframes segIn { from { opacity: 0; transform: translateY(-6px); } }
 
 .form-actions { display: flex; align-items: center; gap: 10px; margin-top: 22px; }
 .form-actions .spacer { flex: 1; }

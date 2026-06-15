@@ -7,6 +7,7 @@
 
   const STORE_KEY = "tanita.bc545n.entries.v1";
   const FOCUS_KEY = "tanita.bc545n.focus";
+  const BADGE_KEY = "tanita.bc545n.earned";
 
   /* ---------- metric definitions ----------
      dir: "up" = higher is favorable, "down" = lower is favorable,
@@ -90,12 +91,14 @@
   }
 
   /* ============================================================ RENDER */
-  function render() {
+  function render(announce = false) {
     renderStatus();
     renderHero();
     renderSegments();
     renderTiles();
     renderFocus();
+    renderCoach();
+    renderBadges(announce);
     renderTable();
   }
 
@@ -392,6 +395,167 @@
     hit.addEventListener("mouseleave", () => { tip.style.opacity = "0"; cross.style.opacity = "0"; hot.style.opacity = "0"; });
   }
 
+  /* ============================================================ ANALYSIS */
+  function seriesOf(k) { return entries.filter(e => num(e[k]) != null); }
+  function lastVal(k) { const s = seriesOf(k); return s.length ? num(s[s.length - 1][k]) : null; }
+  function changeOf(k) { const s = seriesOf(k); if (s.length < 2) return null; return +(num(s[s.length-1][k]) - num(s[0][k])).toFixed(2); }
+  // imbalance between a right/left pair on the most recent reading that has both
+  function imbalance(rk, lk) {
+    const e = [...entries].reverse().find(x => num(x[rk]) != null && num(x[lk]) != null);
+    if (!e) return null;
+    const r = num(e[rk]), l = num(e[lk]), hi = Math.max(r, l), lo = Math.min(r, l);
+    if (hi <= 0) return null;
+    return { r, l, pct: +(((hi - lo) / hi) * 100).toFixed(1), weaker: r < l ? "right" : "left", stronger: r < l ? "left" : "right" };
+  }
+  function spanDays() {
+    if (entries.length < 2) return 0;
+    return Math.round((new Date(entries[entries.length-1].date) - new Date(entries[0].date)) / 86400000);
+  }
+
+  /* ============================================================ THE LAB COACH */
+  function renderCoach() {
+    const grid = $("#coach-grid");
+    if (!entries.length) {
+      grid.innerHTML = `<div class="coach-card tone-warn"><span class="coach-ico">🧪</span><h3>Awaiting your first data point</h3><p>Log a reading and the Lab Coach will read your trends and prescribe training, pescetarian fuel, and balance fixes tailored to you.</p></div>`;
+      return;
+    }
+
+    const cards = [];
+    const muscleChg = changeOf("muscle"), fatChg = changeOf("fat"), viscChg = changeOf("visceral");
+    const w = lastVal("weight"), visc = lastVal("visceral"), fit = lastVal("fitness");
+    const arms = imbalance("armRight", "armLeft"), legs = imbalance("legRight", "legLeft");
+    const single = entries.length < 2;
+
+    /* 1 · Recomposition verdict */
+    if (!single && muscleChg != null && fatChg != null) {
+      let tone, ico, h, body;
+      if (muscleChg > 0 && fatChg < 0) {
+        tone = "tone-good"; ico = "🧬"; h = "Textbook recomposition";
+        body = `Muscle <span class="accent-txt">+${muscleChg.toFixed(1)} kg</span> while body fat fell <span class="accent-txt">${Math.abs(fatChg).toFixed(1)} pts</span>. That's the holy grail — gaining tissue while shedding fat. Don't change a thing: keep the slight surplus-on-lift-days, deficit-on-rest-days rhythm.`;
+      } else if (fatChg > 0 && muscleChg <= 0) {
+        tone = "tone-alert"; ico = "🚨"; h = "Drifting the wrong way";
+        body = `Fat is up <span class="accent-txt">${fatChg.toFixed(1)} pts</span> and muscle isn't moving. Pull daily calories back ~10–15%, hold protein high, and make sure every gym session logs a progressive-overload win. Recomp rewards patience, not crash diets.`;
+      } else {
+        tone = "tone-warn"; ico = "📊"; h = "Mixed signals — tighten up";
+        body = `Muscle ${muscleChg >= 0 ? "+" : ""}${muscleChg.toFixed(1)} kg, fat ${fatChg >= 0 ? "+" : ""}${fatChg.toFixed(1)} pts. Decide one focus for the next 4 weeks: <b>lean gain</b> (small surplus, heavy lifting) or <b>cut</b> (small deficit, keep the weights heavy to protect muscle).`;
+      }
+      cards.push(`<div class="coach-card ${tone}"><span class="coach-ico">${ico}</span><h3>${h}</h3><p>${body}</p></div>`);
+    } else {
+      cards.push(`<div class="coach-card tone-warn"><span class="coach-ico">📈</span><h3>One more reading unlocks trends</h3><p>Log a second session and the Coach will track your recomposition — muscle gained vs. fat lost — and adapt every recommendation to your real numbers.</p></div>`);
+    }
+
+    /* 2 · Protein fuel (pescetarian) */
+    if (w) {
+      const lo = Math.round(w * 1.6), hi = Math.round(w * 2.2), tgt = Math.round(w * 1.9);
+      cards.push(`<div class="coach-card tone-fuel"><span class="coach-ico">🐟</span><h3>Pescetarian protein engine</h3><p>At ${fmt(w,1)} kg, aim for <span class="accent-txt">~${tgt} g protein/day</span> (${lo}–${hi} g) to build muscle. Spread it across meals, lean on:</p><ul><li>Oily fish — salmon, sardines, mackerel (omega-3s also fight visceral fat)</li><li>Eggs, Greek yogurt &amp; cottage cheese</li><li>Tofu, tempeh, edamame &amp; lentils</li><li>A post-lift shake if you fall short</li></ul></div>`);
+    }
+
+    /* 3 · Visceral fat */
+    if (visc != null) {
+      const dropping = viscChg != null && viscChg < 0;
+      let tone, ico, h, body;
+      if (visc >= 10) { tone = "tone-alert"; ico = "🔥"; h = "Visceral fat: priority target"; }
+      else if (visc >= 6) { tone = "tone-warn"; ico = "🎯"; h = "Visceral fat: keep chipping away"; }
+      else { tone = "tone-good"; ico = "🛡️"; h = "Visceral fat: in a good place"; }
+      body = visc >= 6
+        ? `You're at level <span class="accent-txt">${visc}</span>${dropping ? ` and already down ${Math.abs(viscChg)} — momentum!` : "."} Add <b>2× weekly Zone-2 cardio</b> (30–40 min brisk incline walk or bike) on top of lifting, cut liquid calories &amp; refined carbs, and prioritise sleep. Visceral fat is the <em>first</em> fat to go in a deficit.`
+        : `Level <span class="accent-txt">${visc}</span> — healthy range. Maintain with your current lifting + the odd Zone-2 session and fibre-rich meals. ${dropping ? `Nice work trimming it by ${Math.abs(viscChg)}.` : ""}`;
+      cards.push(`<div class="coach-card ${tone}"><span class="coach-ico">${ico}</span><h3>${h}</h3><p>${body}</p></div>`);
+    }
+
+    /* 4 · Left / right balance */
+    if (arms || legs) {
+      const flags = [];
+      if (arms && arms.pct >= 5) flags.push(`your <b>${arms.weaker} arm</b> trails by ${arms.pct}%`);
+      if (legs && legs.pct >= 5) flags.push(`your <b>${legs.weaker} leg</b> trails by ${legs.pct}%`);
+      if (flags.length) {
+        cards.push(`<div class="coach-card tone-warn"><span class="coach-ico">⚖️</span><h3>Even out the imbalance</h3><p>Right now ${flags.join(" and ")}. Fix it with <b>unilateral work</b>:</p><ul><li>Swap some barbell lifts for dumbbells &amp; single-leg moves (split squats, lunges, single-arm rows/presses)</li><li>Always start the set with the <b>weaker side</b>, then match reps on the strong side</li><li>Add 1 extra set to the lagging limb for a few weeks</li></ul></div>`);
+      } else {
+        cards.push(`<div class="coach-card tone-good"><span class="coach-ico">🪞</span><h3>Beautifully symmetrical</h3><p>Left and right are within 5% on both arms and legs. Keep including unilateral accessory work so no side sneaks ahead.</p></div>`);
+      }
+    } else {
+      cards.push(`<div class="coach-card tone-warn"><span class="coach-ico">🦾</span><h3>Track your symmetry</h3><p>Add the optional <b>segmental muscle breakdown</b> when you log a reading and the Coach will flag any left/right imbalance and prescribe unilateral fixes.</p></div>`);
+    }
+
+    /* 5 · Strength programming */
+    const lowFit = fit != null && fit < 5;
+    cards.push(`<div class="coach-card tone-good"><span class="coach-ico">🏋️</span><h3>Your strength blueprint</h3><p>${lowFit ? "Build the base with a <b>3× full-body week</b> — " : "Run a <b>4-day upper/lower or push-pull split</b> — "}compounds first, then accessories:</p><ul><li>Anchor lifts: squat, hinge/deadlift, press, row, pull-up</li><li><b>Progressive overload</b> — add a rep or a little load almost every week</li><li>10–20 hard sets per muscle per week; 2–3 min rest on the big lifts</li><li>Leave 1–2 reps in the tank, train each muscle 2×/week</li></ul></div>`);
+
+    grid.innerHTML = cards.join("");
+  }
+
+  /* ============================================================ TROPHY CABINET */
+  const BADGES = [
+    { id: "firstContact", medal: "🛸", name: "First Contact", tier: "bronze",   desc: "Log your very first reading.",            test: c => ({ earned: c.n >= 1, progress: c.n / 1 }) },
+    { id: "committed",    medal: "🔁", name: "Repeat Offender", tier: "silver", desc: "Log 5 readings. It's a habit now.",       test: c => ({ earned: c.n >= 5, progress: c.n / 5 }) },
+    { id: "cabinet",      medal: "🏛️", name: "Cabinet Member", tier: "gold",    desc: "Log 10 readings. Certified regular.",     test: c => ({ earned: c.n >= 10, progress: c.n / 10 }) },
+    { id: "fortnight",    medal: "🗓️", name: "Fortnight Phantom", tier: "bronze", desc: "Keep logging across 14+ days.",         test: c => ({ earned: c.spanDays >= 14, progress: c.spanDays / 14 }) },
+    { id: "bulk",         medal: "💪", name: "The Incredible Bulk", tier: "gold", desc: "Pack on +2 kg of muscle since day one.", test: c => ({ earned: c.muscleChg != null && c.muscleChg >= 2, progress: c.muscleChg != null ? c.muscleChg / 2 : 0 }) },
+    { id: "recomp",       medal: "🧬", name: "Recomp Royalty", tier: "platinum", desc: "Gain muscle AND cut fat % at once.",     test: c => ({ earned: c.muscleChg != null && c.fatChg != null && c.muscleChg > 0 && c.fatChg < 0, progress: null }) },
+    { id: "fatWhisperer", medal: "🫠", name: "Fat Whisperer", tier: "silver",    desc: "Drop body fat by 2 percentage points.",   test: c => ({ earned: c.fatChg != null && c.fatChg <= -2, progress: c.fatChg != null ? (-c.fatChg) / 2 : 0 }) },
+    { id: "visceral",     medal: "🛡️", name: "Visceral Vigilante", tier: "gold", desc: "Drop visceral fat by 2 whole levels.",   test: c => ({ earned: c.viscChg != null && c.viscChg <= -2, progress: c.viscChg != null ? (-c.viscChg) / 2 : 0 }) },
+    { id: "symmetry",     medal: "⚖️", name: "The Even Steven", tier: "platinum", desc: "Arms & legs within 3% of each other.",  test: c => ({ earned: c.armBal != null && c.legBal != null && c.armBal <= 3 && c.legBal <= 3, progress: null }) },
+    { id: "hydro",        medal: "💧", name: "Hydro Homie", tier: "bronze",      desc: "Hit 55%+ body water. Basically a cucumber.", test: c => ({ earned: c.waterLast != null && c.waterLast >= 55, progress: c.waterLast != null ? c.waterLast / 55 : 0 }) },
+    { id: "benjamin",     medal: "⏳", name: "Benjamin Button", tier: "silver",  desc: "Knock 3 years off your metabolic age.",   test: c => ({ earned: c.bioChg != null && c.bioChg <= -3, progress: c.bioChg != null ? (-c.bioChg) / 3 : 0 }) },
+    { id: "ironwill",     medal: "🦾", name: "Maxed Out", tier: "gold",          desc: "Reach fitness level 8.",                  test: c => ({ earned: c.fitMax != null && c.fitMax >= 8, progress: c.fitMax != null ? c.fitMax / 8 : 0 }) },
+    { id: "trunk",        medal: "🌳", name: "Trunk Junk", tier: "silver",       desc: "Add 1 kg of trunk muscle.",               test: c => ({ earned: c.trunkChg != null && c.trunkChg >= 1, progress: c.trunkChg != null ? c.trunkChg / 1 : 0 }) },
+    { id: "feather",      medal: "🪶", name: "Gravity Defiant", tier: "silver",  desc: "Shed 3 kg on the scale.",                 test: c => ({ earned: c.weightChg != null && c.weightChg <= -3, progress: c.weightChg != null ? (-c.weightChg) / 3 : 0 }) },
+  ];
+
+  function badgeContext() {
+    const arms = imbalance("armRight", "armLeft"), legs = imbalance("legRight", "legLeft");
+    const fitS = seriesOf("fitness");
+    return {
+      n: entries.length,
+      spanDays: spanDays(),
+      muscleChg: changeOf("muscle"),
+      fatChg: changeOf("fat"),
+      viscChg: changeOf("visceral"),
+      bioChg: changeOf("bioage"),
+      trunkChg: changeOf("trunk"),
+      weightChg: changeOf("weight"),
+      waterLast: lastVal("water"),
+      fitMax: fitS.length ? Math.max(...fitS.map(e => num(e.fitness))) : null,
+      armBal: arms ? arms.pct : null,
+      legBal: legs ? legs.pct : null,
+    };
+  }
+
+  function renderBadges(announce) {
+    const ctx = badgeContext();
+    const results = BADGES.map(b => ({ b, r: b.test(ctx) }));
+    const earnedIds = results.filter(x => x.r.earned).map(x => x.b.id);
+
+    // newly-unlocked detection
+    let prev = [];
+    try { prev = JSON.parse(localStorage.getItem(BADGE_KEY) || "[]"); } catch {}
+    const fresh = earnedIds.filter(id => !prev.includes(id));
+    localStorage.setItem(BADGE_KEY, JSON.stringify(earnedIds));
+    if (announce && fresh.length) {
+      if (fresh.length === 1) {
+        const b = BADGES.find(x => x.id === fresh[0]);
+        toast(`${b.medal} Badge unlocked: ${b.name}!`);
+      } else {
+        toast(`🏅 ${fresh.length} new badges unlocked!`);
+      }
+    }
+
+    $("#badge-score").innerHTML = `<div class="bs-count">${earnedIds.length}<small>/${BADGES.length}</small></div><div class="bs-label">unlocked</div>`;
+
+    $("#badge-grid").innerHTML = results.map(({ b, r }) => {
+      const prog = r.progress == null ? null : Math.max(0, Math.min(1, r.progress));
+      const bar = (!r.earned && prog != null && prog > 0)
+        ? `<div class="b-prog"><span style="width:${(prog*100).toFixed(0)}%"></span></div>` : "";
+      return `<div class="badge tier-${b.tier} ${r.earned ? "earned" : "locked"}" title="${r.earned ? "Unlocked!" : "Locked"}">
+        <span class="b-tier">${b.tier}</span>
+        <span class="b-medal">${b.medal}</span>
+        <div class="b-name">${b.name}</div>
+        <div class="b-desc">${b.desc}</div>
+        ${bar}
+      </div>`;
+    }).join("");
+  }
+
   /* ---------- LOG TABLE ---------- */
   function renderTable() {
     const t = $("#log-table");
@@ -415,6 +579,7 @@
     form.reset();
     $("#f-id").value = "";
     $("#btn-delete").hidden = true;
+    $("#seg-details").open = false;
     if (id) {
       const e = entries.find(x => x.id === id);
       if (e) {
@@ -423,6 +588,8 @@
         $("#f-date").value = e.date;
         ALL_FIELDS.forEach(k => { const el = $("#f-" + k); if (el) el.value = e[k] ?? ""; });
         $("#btn-delete").hidden = false;
+        // reveal the segmental panel if this reading has any segmental data
+        if (SEGMENTS.some(s => num(e[s.key]) != null)) $("#seg-details").open = true;
       }
     } else {
       $("#modal-title").textContent = "New Reading";
@@ -457,7 +624,7 @@
         toast("Reading saved.");
       }
     }
-    save(); render(); closeModal();
+    save(); render(true); closeModal();
   });
 
   $("#btn-delete").onclick = () => {
@@ -465,7 +632,7 @@
     if (!id) return;
     if (confirm("Delete this reading permanently?")) {
       entries = entries.filter(x => x.id !== id);
-      save(); render(); closeModal(); toast("Reading deleted.");
+      save(); render(true); closeModal(); toast("Reading deleted.");
     }
   };
 
@@ -497,7 +664,7 @@
           added++;
         });
         entries = [...byDateMap.values()].sort(byDate);
-        save(); render();
+        save(); render(true);
         toast(`Imported ${added} readings.`);
       } catch { toast("Could not read that file."); }
     };
@@ -537,7 +704,7 @@
     const map = new Map(entries.map(e => [e.date, e]));
     demo.forEach(d => map.set(d.date, d));
     entries = [...map.values()].sort(byDate);
-    save(); render(); toast("Sample data loaded.");
+    save(); render(true); toast("Sample data loaded.");
   }
 
   /* ============================================================ TOAST */
@@ -565,7 +732,7 @@
   $("#btn-clear").onclick = () => {
     if (!entries.length) { toast("Already empty."); return; }
     if (confirm("Erase ALL readings from this browser? This cannot be undone.")) {
-      entries = []; save(); render(); toast("All readings erased.");
+      entries = []; save(); render(true); toast("All readings erased.");
     }
   };
 
